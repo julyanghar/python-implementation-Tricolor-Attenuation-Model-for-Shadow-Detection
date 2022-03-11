@@ -106,33 +106,36 @@ def rectify_shadow(img:np.ndarray,shadow_img:np.ndarray,markers:np.ndarray,mark:
         # 获得已分割的区域的坐标
         coordinates_region = np.where(markers == i)
 
+        if len(coordinates_region) == 0:
+            continue
+
         # 查找已分割区域的，且是非阴影区域的坐标点
-        coordinates_shadow_region, coordinates_nonshadow_region = find_shadow_nonshadow__pixels_in_tuples_of_two_lists(coordinates_region,shadow_img)
+        coordinates_shadow_region, coordinates_nonshadow_region = find_shadow_nonshadow_pixels_in_tuples_of_two_lists(coordinates_region,shadow_img)
         # 下面一行代码可以优化
 
         is_shadow = False
 
-        F_R_NS = np.mean(R[coordinates_nonshadow_region])
+        F_R_NS = get_mean_by_coordinations(R, coordinates_nonshadow_region)
         if np.isnan(F_R_NS):
             F_R_NS = 0
 
-        F_G_NS = np.mean(G[coordinates_nonshadow_region])
+        F_G_NS = get_mean_by_coordinations(G, coordinates_nonshadow_region)
         if np.isnan(F_G_NS):
             F_G_NS = 0
 
-        F_B_NS = np.mean(B[coordinates_nonshadow_region])
+        F_B_NS = get_mean_by_coordinations(B, coordinates_nonshadow_region)
         if np.isnan(F_B_NS):
             F_B_NS = 0
 
-        F_R_S = np.mean(R[coordinates_shadow_region])
+        F_R_S = get_mean_by_coordinations(R, coordinates_shadow_region)
         if np.isnan(F_R_S):
             F_R_S = 0
 
-        F_G_S = np.mean(G[coordinates_shadow_region])
+        F_G_S = get_mean_by_coordinations(G, coordinates_shadow_region)
         if np.isnan(F_G_S):
             F_G_S = 0
 
-        F_B_S = np.mean(B[coordinates_shadow_region])
+        F_B_S = get_mean_by_coordinations(B, coordinates_shadow_region)
         if np.isnan(F_B_S):
             F_B_S = 0
 
@@ -180,8 +183,12 @@ def rectify_shadow_with_origin_img(origin_img:np.ndarray,shadow_img:np.ndarray,m
     for i in range(1, mark):
         # 获得已分割的区域的坐标
         coordinates_region = np.where(markers == i)
+
+        if len(coordinates_region) == 0:
+            continue
+
         # 查找区域中阴影区域的坐标点
-        coordinates_shadow_region = find_shadow_pixels_in_tuples_of_two_lists(coordinates_region,shadow_img)
+        coordinates_shadow_region, _ = find_shadow_nonshadow_pixels_in_tuples_of_two_lists(coordinates_region,shadow_img)
         is_shadow = False
 
         F_R = np.mean(R[coordinates_region])
@@ -196,18 +203,20 @@ def rectify_shadow_with_origin_img(origin_img:np.ndarray,shadow_img:np.ndarray,m
         if (np.isnan(F_B)):
             F_B = 0
 
-        for j in range(len(coordinates_shadow_region[0])):
+        length = len(coordinates_shadow_region)
 
-            F_R_ = R[coordinates_shadow_region[0][j]][coordinates_shadow_region[1][j]]
-            F_G_ = G[coordinates_shadow_region[0][j]][coordinates_shadow_region[1][j]]
-            F_B_ = B[coordinates_shadow_region[0][j]][coordinates_shadow_region[1][j]]
+        for j in range(length):
+
+            F_R_ = R[coordinates_shadow_region[j][0]][coordinates_shadow_region[j][1]]
+            F_G_ = G[coordinates_shadow_region[j][0]][coordinates_shadow_region[j][1]]
+            F_B_ = B[coordinates_shadow_region[j][0]][coordinates_shadow_region[j][1]]
 
             if F_R_ < F_R:
                 if F_G_ < F_G:
                     if F_B_ < F_B:
                         is_shadow = True
-                        x = coordinates_shadow_region[0][j]
-                        y = coordinates_shadow_region[1][j]
+                        x = coordinates_shadow_region[j][0]
+                        y = coordinates_shadow_region[j][1]
 
             if is_shadow:
                 res[x][y] = 0
@@ -215,8 +224,20 @@ def rectify_shadow_with_origin_img(origin_img:np.ndarray,shadow_img:np.ndarray,m
 
     return res
 
+def get_mean_by_coordinations(img:np.ndarray, coordinations:list)->float:
+    total = 0
+    mean = 0
+    length = len(coordinations)
 
-def find_shadow_nonshadow__pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->(list,list):
+    if length == 0:
+        return np.nan
+
+    for i in range(length):
+        total += img[coordinations[i][0]][coordinations[i][1]]
+
+    return total / length
+
+def find_shadow_nonshadow_pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->(list,list):
     res_shadow = []
     res_nonshadow = []
 
@@ -236,82 +257,82 @@ def find_shadow_nonshadow__pixels_in_tuples_of_two_lists(origin_tuple:tuple,shad
         else:
             res_nonshadow.append((x, y))
     return (res_shadow, res_nonshadow)
-
-def find_shadow_pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->tuple:
-    res = np.array(origin_tuple)
-    colum_origin = len(origin_tuple[0])
-    colum = colum_origin
-    res = res.reshape((-1))
-    delete_num = 0
-
-    for i in range(colum_origin):
-        is_shadow = False
-
-        x = origin_tuple[0][i]
-        y = origin_tuple[1][i]
-
-        if shadow_img[x][y] == 0:
-            is_shadow = True
-
-        if is_shadow == False:
-            res = np.delete(res, (i - delete_num))
-            colum = colum - 1
-            res = np.delete(res, (i + colum - delete_num))
-            delete_num += 1
-
-    res = res.reshape(2, -1)
-    return tuple(res)
-
-
-def find_nonshadow_pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->tuple:
-
-    res = np.array(origin_tuple)
-    colum_origin = len(origin_tuple[0])
-    colum = colum_origin
-    res = res.reshape((-1))
-    delete_num = 0
-
-    for i in range(colum_origin):
-        is_shadow = True
-
-        x = origin_tuple[0][i]
-        y = origin_tuple[1][i]
-
-        if shadow_img[x][y] == 255:
-            is_shadow = False
-
-        if is_shadow == True:
-            res = np.delete(res, (i - delete_num))
-            colum = colum - 1
-            res = np.delete(res, (i + colum - delete_num))
-            delete_num += 1
-
-    res = res.reshape(2, -1)
-    return tuple(res)
-
-def find_elements_in_tuples_of_two_lists(sub_tuple:tuple,origin_tuple:tuple)->tuple:
-    res = np.array(sub_tuple)
-    colum_origin = len(sub_tuple[0])
-    colum = colum_origin
-    res = res.reshape((-1))
-    delete_num = 0
-
-    for i in range(colum_origin):
-        label = False
-        for j in range(len(origin_tuple[0])):
-            if sub_tuple[0][i] == origin_tuple[0][j]:
-                if sub_tuple[1][i] == origin_tuple[1][j]:
-                    label = True
-                    break
-
-        if label == False:
-            res = np.delete(res, (i-delete_num))
-            colum = colum-1
-            res = np.delete(res, (i+colum-delete_num))
-            delete_num += 1
-
-    res = res.reshape(2,-1)
-    return tuple(res)
+#
+# def find_shadow_pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->tuple:
+#     res = np.array(origin_tuple)
+#     colum_origin = len(origin_tuple[0])
+#     colum = colum_origin
+#     res = res.reshape((-1))
+#     delete_num = 0
+#
+#     for i in range(colum_origin):
+#         is_shadow = False
+#
+#         x = origin_tuple[0][i]
+#         y = origin_tuple[1][i]
+#
+#         if shadow_img[x][y] == 0:
+#             is_shadow = True
+#
+#         if is_shadow == False:
+#             res = np.delete(res, (i - delete_num))
+#             colum = colum - 1
+#             res = np.delete(res, (i + colum - delete_num))
+#             delete_num += 1
+#
+#     res = res.reshape(2, -1)
+#     return tuple(res)
+#
+#
+# def find_nonshadow_pixels_in_tuples_of_two_lists(origin_tuple:tuple,shadow_img:np.ndarray)->tuple:
+#
+#     res = np.array(origin_tuple)
+#     colum_origin = len(origin_tuple[0])
+#     colum = colum_origin
+#     res = res.reshape((-1))
+#     delete_num = 0
+#
+#     for i in range(colum_origin):
+#         is_shadow = True
+#
+#         x = origin_tuple[0][i]
+#         y = origin_tuple[1][i]
+#
+#         if shadow_img[x][y] == 255:
+#             is_shadow = False
+#
+#         if is_shadow == True:
+#             res = np.delete(res, (i - delete_num))
+#             colum = colum - 1
+#             res = np.delete(res, (i + colum - delete_num))
+#             delete_num += 1
+#
+#     res = res.reshape(2, -1)
+#     return tuple(res)
+#
+# def find_elements_in_tuples_of_two_lists(sub_tuple:tuple,origin_tuple:tuple)->tuple:
+#     res = np.array(sub_tuple)
+#     colum_origin = len(sub_tuple[0])
+#     colum = colum_origin
+#     res = res.reshape((-1))
+#     delete_num = 0
+#
+#     for i in range(colum_origin):
+#         label = False
+#         for j in range(len(origin_tuple[0])):
+#             if sub_tuple[0][i] == origin_tuple[0][j]:
+#                 if sub_tuple[1][i] == origin_tuple[1][j]:
+#                     label = True
+#                     break
+#
+#         if label == False:
+#             res = np.delete(res, (i-delete_num))
+#             colum = colum-1
+#             res = np.delete(res, (i+colum-delete_num))
+#             delete_num += 1
+#
+#     res = res.reshape(2,-1)
+#     return tuple(res)
 
 
 def detect_shadow(img:np.ndarray)->np.ndarray:
