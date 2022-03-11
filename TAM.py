@@ -8,12 +8,11 @@ def watershed(img:np.ndarray)->np.ndarray:
 
 def get_Gray_pixel_value(B:float,G:float,R:float)->float:
     value = max(R,G,B)/(min(R,G,B)+1)
-    Y = 0
     if value == 0:
-        Y = float('inf')
+        value = float('inf')
     else:
-        Y = math.log(value)
-    return Y
+        value = math.log(value)
+    return value
 
 def RGB2GRAY(img:np.ndarray)->np.ndarray:
     height = img.shape[0]
@@ -96,7 +95,7 @@ def get_CombinedImage(img:np.ndarray,TAMimg:np.ndarray)->np.ndarray:
 
     # normalization
     combinedImg_result = np.zeros(shape=img_gray.shape)
-    result = cv2.normalize(src=combinedImg,dst=combinedImg_result,alpha=0,beta=255,norm_type=cv2.NORM_MINMAX,dtype=cv2.CV_32F)
+    result = cv2.normalize(src=combinedImg,dst=combinedImg_result,alpha=0,beta=255,norm_type=cv2.NORM_MINMAX,dtype=cv2.CV_8U)
     return result
 
 
